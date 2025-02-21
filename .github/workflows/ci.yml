@@ -17,8 +17,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - run: pip install pytest pytest-cov pydantic fastapi uvicorn httpx numpy
-      - run: pytest tests/ -v --cov=. --cov-report=xml --ignore=tests/__init__.py 2>/dev/null || echo "::warning::No tests found — add tests to increase coverage"
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-cov pydantic fastapi uvicorn httpx numpy scipy pandas
+      - name: Run tests with 95% coverage threshold
+        run: |
+          pytest tests/ -v \
+            --cov=feature_store \
+            --cov=monitoring \
+            --cov=model_registry \
+            --cov=pipelines \
+            --cov=api \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=95 \
+            --ignore=tests/__init__.py
   security:
     runs-on: ubuntu-latest
     steps:
