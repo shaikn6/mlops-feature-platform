@@ -1,0 +1,173 @@
+# Apache Airflow Helm chart values
+# Chart: apache-airflow/airflow  version: 1.13.x
+# kubectl create namespace airflow
+# helm upgrade --install airflow apache-airflow/airflow -n airflow -f k8s/airflow-values.yaml
+
+airflowVersion: "2.9.2"
+defaultAirflowTag: "2.9.2"
+
+executor: KubernetesExecutor
+
+# ── Image ────────────────────────────────────────────────────────────────────
+images:
+  airflow:
+    repository: ghcr.io/shaikn6/mlops-feature-platform/airflow
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# ── Git-sync: DAGs synced from the repo every 60 s ───────────────────────────
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/shaikn6/mlops-feature-platform.git
+    branch: main
+    rev: HEAD
+    depth: 1
+    maxFailures: 3
+    subPath: "pipelines/dags"
+    period: 60
+    containerName: git-sync
+    uid: 65533
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ── Database: external PostgreSQL ────────────────────────────────────────────
+postgresql:
+  enabled: false   # use external RDS
+
+data:
+  metadataSecretName: airflow-metadata-secret   # key: connection
+  # Secret example:
+  #   connection: postgresql+psycopg2://airflow:password@rds-host:5432/airflow
+
+# ── Redis (for CeleryExecutor compatibility; disabled here) ──────────────────
+redis:
+  enabled: false
+
+# ── Webserver ────────────────────────────────────────────────────────────────
+webserver:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 5
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 5
+  service:
+    type: ClusterIP
+    port: 8080
+  defaultUser:
+    enabled: true
+    role: Admin
+    username: admin
+    email: admin@mlops.example.com
+    firstName: Admin
+    lastName: User
+    password: changeme   # override via --set in CI
+
+# ── Scheduler ────────────────────────────────────────────────────────────────
+scheduler:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    failureThreshold: 5
+
+# ── Kubernetes Executor pod template ─────────────────────────────────────────
+config:
+  kubernetes_executor:
+    namespace: airflow
+    worker_pods_creation_batch_size: "16"
+    delete_worker_pods: "True"
+    delete_worker_pods_on_failure: "False"
+
+workers:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# ── Extra env vars (non-sensitive) ────────────────────────────────────────────
+env:
+  - name: AIRFLOW__CORE__LOAD_EXAMPLES
+    value: "False"
+  - name: AIRFLOW__CORE__DEFAULT_TIMEZONE
+    value: "UTC"
+  - name: AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL
+    value: "30"
+  - name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG
+    value: "False"
+  - name: MLFLOW_TRACKING_URI
+    value: "http://mlflow.mlflow.svc.cluster.local:5000"
+  - name: FEAST_REPO_PATH
+    value: "/opt/airflow/feature_store"
+
+# ── Extra secrets mounted ─────────────────────────────────────────────────────
+extraSecrets:
+  airflow-connections:
+    data:
+      AIRFLOW_CONN_SPARK_DEFAULT: "spark://spark-master.spark.svc.cluster.local:7077"
+      AIRFLOW_CONN_AWS_DEFAULT: "aws://?region_name=us-east-1"
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  web:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - name: airflow.mlops.example.com
+        tls:
+          enabled: true
+          secretName: airflow-tls
+    path: /
+    pathType: Prefix
+
+# ── Logs: remote S3 ───────────────────────────────────────────────────────────
+logs:
+  persistence:
+    enabled: false
+
+extraEnv: |
+  - name: AIRFLOW__LOGGING__REMOTE_LOGGING
+    value: "True"
+  - name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER
+    value: "s3://mlops-airflow-logs"
+  - name: AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID
+    value: "aws_default"
+
+# ── RBAC for KubernetesExecutor pod launch ────────────────────────────────────
+rbac:
+  create: true
+  createSCCRoleBinding: false
+
+serviceAccount:
+  create: true
+  name: airflow
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/airflow-irsa-role
