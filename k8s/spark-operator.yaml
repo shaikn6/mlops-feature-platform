@@ -1,0 +1,143 @@
+# SparkApplication CRD — spark-on-k8s-operator v1beta2
+# Runs the feature_computation.py PySpark job for a given execution date.
+#
+# Apply:
+#   kubectl apply -f k8s/spark-operator.yaml
+# Or patch the executionDate and apply via Airflow SparkKubernetesOperator.
+---
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: feature-computation
+  namespace: spark
+  labels:
+    app: feature-computation
+    version: "1.0"
+    app.kubernetes.io/part-of: mlops-feature-platform
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: ghcr.io/shaikn6/mlops-feature-platform/spark:3.5-delta
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: "s3a://mlops-spark-jobs/feature_computation.py"
+
+  sparkVersion: "3.5.1"
+
+  sparkConf:
+    "spark.sql.extensions":         "io.delta.sql.DeltaSparkSessionExtension"
+    "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    "spark.sql.shuffle.partitions":  "400"
+    "spark.serializer":             "org.apache.spark.serializer.KryoSerializer"
+    "spark.hadoop.fs.s3a.impl":     "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "spark.hadoop.fs.s3a.aws.credentials.provider": "com.amazonaws.auth.WebIdentityTokenCredentialsProvider"
+    "spark.eventLog.enabled":       "true"
+    "spark.eventLog.dir":           "s3a://mlops-spark-history/"
+    "spark.metrics.conf.*.sink.prometheusServlet.class": "org.apache.spark.metrics.sink.PrometheusServlet"
+
+  arguments:
+    - "--input"
+    - "s3a://mlops-raw-events/events/"
+    - "--output"
+    - "s3a://mlops-feature-store/features/user_transaction_features/"
+    - "--execution-date"
+    - "2026-06-17"   # overridden at runtime by Airflow SparkKubernetesOperator
+
+  driver:
+    cores: 2
+    coreLimit: "2000m"
+    memory: "4g"
+    memoryOverhead: "1g"
+    serviceAccount: spark
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port:   "4040"
+    labels:
+      role: driver
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: spark
+        effect: NoSchedule
+    nodeSelector:
+      node-role: spark
+    env:
+      - name: AWS_REGION
+        value: us-east-1
+
+  executor:
+    cores: 4
+    coreLimit: "4000m"
+    instances: 5
+    memory: "8g"
+    memoryOverhead: "2g"
+    labels:
+      role: executor
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: spark
+        effect: NoSchedule
+    nodeSelector:
+      node-role: spark
+
+  restartPolicy:
+    type: OnFailure
+    onFailureRetries: 2
+    onFailureRetryInterval: 10
+    onSubmissionFailureRetries: 3
+    onSubmissionFailureRetryInterval: 20
+
+  monitoring:
+    exposeDriverMetrics: true
+    exposeExecutorMetrics: true
+    prometheus:
+      jmxExporterJar: "/prometheus/jmx_prometheus_javaagent.jar"
+      port: 8090
+
+  dynamicAllocation:
+    enabled: true
+    initialExecutors: 2
+    minExecutors: 2
+    maxExecutors: 20
+    shuffleTrackingTimeout: 300000
+
+---
+# ServiceAccount + IRSA annotation for S3 access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spark
+  namespace: spark
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/spark-irsa-role
+
+---
+# ClusterRole for spark-operator to manage SparkApplications
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: spark-role
+  namespace: spark
+rules:
+  - apiGroups: [""]
+    resources: [pods, services, configmaps, persistentvolumeclaims]
+    verbs: [create, get, list, watch, delete, update, patch]
+  - apiGroups: [sparkoperator.k8s.io]
+    resources: [sparkapplications, scheduledsparkapplications]
+    verbs: [create, get, list, watch, delete, update, patch]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spark-role-binding
+  namespace: spark
+subjects:
+  - kind: ServiceAccount
+    name: spark
+    namespace: spark
+roleRef:
+  kind: Role
+  name: spark-role
+  apiGroup: rbac.authorization.k8s.io
