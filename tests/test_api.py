@@ -11,11 +11,7 @@ and create a comprehensive FastAPI endpoint test suite covering:
 
 from __future__ import annotations
 
-import sys
-from types import ModuleType
-from typing import Any
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,6 +19,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Minimal FastAPI app fixture (simulates the actual API layer)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def app():
@@ -75,14 +72,19 @@ def app():
         features = payload.get("features", [])
         if not entity_rows:
             raise HTTPException(status_code=422, detail="entity_rows must not be empty")
-        result = mock_feature_server.get_online_features(entity_rows, features)
+        try:
+            result = mock_feature_server.get_online_features(entity_rows, features)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {"data": result}
 
     @app.post("/features/fraud")
     def get_fraud_features(payload: dict):
         customer_ids = payload.get("customer_ids", [])
         if not customer_ids:
-            raise HTTPException(status_code=422, detail="customer_ids must not be empty")
+            raise HTTPException(
+                status_code=422, detail="customer_ids must not be empty"
+            )
         result = mock_feature_server.get_fraud_features_online(customer_ids)
         return {"data": result, "count": len(result)}
 
@@ -104,11 +106,14 @@ def app():
         snap = mock_dashboard.get_model_health(model_name)
         if snap is None:
             raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
-        return snap.to_dict() if hasattr(snap, "to_dict") else {"model_name": model_name}
+        return (
+            snap.to_dict() if hasattr(snap, "to_dict") else {"model_name": model_name}
+        )
 
     @app.get("/metrics")
     def prometheus_metrics():
         from fastapi.responses import PlainTextResponse
+
         output = mock_dashboard.prometheus_metrics()
         return PlainTextResponse(content=output, media_type="text/plain")
 
@@ -142,6 +147,7 @@ def client(app):
 # Health endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestHealthEndpoints:
     def test_health_returns_200(self, client):
         tc, *_ = client
@@ -172,6 +178,7 @@ class TestHealthEndpoints:
 # ---------------------------------------------------------------------------
 # Feature serving endpoints
 # ---------------------------------------------------------------------------
+
 
 class TestOnlineFeaturesEndpoint:
     def test_valid_request_returns_200(self, client):
@@ -259,6 +266,7 @@ class TestCreditFeaturesEndpoint:
 # ---------------------------------------------------------------------------
 # Model monitoring endpoints
 # ---------------------------------------------------------------------------
+
 
 class TestModelsHealthEndpoint:
     def test_returns_200(self, client):
@@ -364,8 +372,9 @@ class TestRetrainCandidatesEndpoint:
 # API package structure
 # ---------------------------------------------------------------------------
 
+
 class TestApiPackage:
     def test_api_init_importable(self):
         import api
-        assert api.__version__ == "1.0.0"
 
+        assert api.__version__ == "1.0.0"
