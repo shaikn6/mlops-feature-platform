@@ -8,8 +8,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,6 @@ from monitoring.drift_detector import (
     DATASET_DRIFT_THRESHOLD,
     PSI_HIGH,
     PSI_LOW,
-    PSI_MEDIUM,
     DriftDetector,
     DriftReport,
     FeatureDriftResult,
@@ -31,6 +29,7 @@ from monitoring.drift_detector import (
 # ---------------------------------------------------------------------------
 # _compute_psi
 # ---------------------------------------------------------------------------
+
 
 class TestComputePsi:
     def test_identical_distributions_near_zero(self):
@@ -77,6 +76,7 @@ class TestComputePsi:
 # _psi_label
 # ---------------------------------------------------------------------------
 
+
 class TestPsiLabel:
     def test_below_low_threshold_returns_low(self):
         assert _psi_label(PSI_LOW - 0.01) == "LOW"
@@ -100,6 +100,7 @@ class TestPsiLabel:
 # ---------------------------------------------------------------------------
 # FeatureDriftResult
 # ---------------------------------------------------------------------------
+
 
 class TestFeatureDriftResult:
     def test_basic_construction(self):
@@ -135,6 +136,7 @@ class TestFeatureDriftResult:
 # ---------------------------------------------------------------------------
 # DriftReport
 # ---------------------------------------------------------------------------
+
 
 class TestDriftReport:
     def _make_report(self, drifted=False, ratio=0.0, retrain=False):
@@ -190,6 +192,7 @@ class TestDriftReport:
 # DriftDetector.__init__
 # ---------------------------------------------------------------------------
 
+
 class TestDriftDetectorInit:
     def test_default_values(self):
         det = DriftDetector(model_name="test_model")
@@ -218,6 +221,7 @@ class TestDriftDetectorInit:
 # ---------------------------------------------------------------------------
 # DriftDetector.detect() — mocked Evidently
 # ---------------------------------------------------------------------------
+
 
 def _make_evidently_raw(drifted_count=1, total=5, drift_ratio=0.2, dataset_drift=False):
     return {
@@ -264,31 +268,38 @@ def mock_evidently():
     mock_report_cls.return_value = mock_report_inst
     mock_report_inst.as_dict.return_value = _make_evidently_raw()
 
-    with patch.dict("sys.modules", {
-        "evidently": MagicMock(ColumnMapping=MagicMock()),
-        "evidently.metrics": MagicMock(
-            DataDriftTable=MagicMock(),
-            DatasetDriftMetric=MagicMock(),
-        ),
-        "evidently.report": MagicMock(Report=mock_report_cls),
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "evidently": MagicMock(ColumnMapping=MagicMock()),
+            "evidently.metrics": MagicMock(
+                DataDriftTable=MagicMock(),
+                DatasetDriftMetric=MagicMock(),
+            ),
+            "evidently.report": MagicMock(Report=mock_report_cls),
+        },
+    ):
         yield mock_report_cls, mock_report_inst
 
 
 class TestDriftDetectorDetect:
     def _ref_df(self):
         rng = np.random.default_rng(0)
-        return pd.DataFrame({
-            "avg_spend_7d": rng.normal(100, 20, 200),
-            "customer_segment": np.random.choice(["RETAIL", "PREMIUM"], 200),
-        })
+        return pd.DataFrame(
+            {
+                "avg_spend_7d": rng.normal(100, 20, 200),
+                "customer_segment": np.random.choice(["RETAIL", "PREMIUM"], 200),
+            }
+        )
 
     def _cur_df(self):
         rng = np.random.default_rng(1)
-        return pd.DataFrame({
-            "avg_spend_7d": rng.normal(150, 30, 200),
-            "customer_segment": np.random.choice(["RETAIL", "PREMIUM"], 200),
-        })
+        return pd.DataFrame(
+            {
+                "avg_spend_7d": rng.normal(150, 30, 200),
+                "customer_segment": np.random.choice(["RETAIL", "PREMIUM"], 200),
+            }
+        )
 
     def test_returns_drift_report(self, mock_evidently):
         det = DriftDetector(model_name="fraud_v3")
@@ -323,19 +334,24 @@ class TestDriftDetectorDetect:
         assert cat_feat.psi is None
 
     def test_recommend_retrain_when_high_ratio(self):
-        raw = _make_evidently_raw(drifted_count=3, total=5, drift_ratio=0.6, dataset_drift=True)
+        raw = _make_evidently_raw(
+            drifted_count=3, total=5, drift_ratio=0.6, dataset_drift=True
+        )
         mock_report_cls = MagicMock()
         mock_report_inst = MagicMock()
         mock_report_cls.return_value = mock_report_inst
         mock_report_inst.as_dict.return_value = raw
 
-        with patch.dict("sys.modules", {
-            "evidently": MagicMock(ColumnMapping=MagicMock()),
-            "evidently.metrics": MagicMock(
-                DataDriftTable=MagicMock(), DatasetDriftMetric=MagicMock()
-            ),
-            "evidently.report": MagicMock(Report=mock_report_cls),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "evidently": MagicMock(ColumnMapping=MagicMock()),
+                "evidently.metrics": MagicMock(
+                    DataDriftTable=MagicMock(), DatasetDriftMetric=MagicMock()
+                ),
+                "evidently.report": MagicMock(Report=mock_report_cls),
+            },
+        ):
             rng = np.random.default_rng(0)
             ref = pd.DataFrame({"avg_spend_7d": rng.normal(100, 20, 200)})
             cur = pd.DataFrame({"avg_spend_7d": rng.normal(200, 50, 200)})
@@ -344,19 +360,24 @@ class TestDriftDetectorDetect:
             assert report.recommend_retrain is True
 
     def test_no_retrain_when_low_drift(self):
-        raw = _make_evidently_raw(drifted_count=0, total=5, drift_ratio=0.0, dataset_drift=False)
+        raw = _make_evidently_raw(
+            drifted_count=0, total=5, drift_ratio=0.0, dataset_drift=False
+        )
         mock_report_cls = MagicMock()
         mock_report_inst = MagicMock()
         mock_report_cls.return_value = mock_report_inst
         mock_report_inst.as_dict.return_value = raw
 
-        with patch.dict("sys.modules", {
-            "evidently": MagicMock(ColumnMapping=MagicMock()),
-            "evidently.metrics": MagicMock(
-                DataDriftTable=MagicMock(), DatasetDriftMetric=MagicMock()
-            ),
-            "evidently.report": MagicMock(Report=mock_report_cls),
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "evidently": MagicMock(ColumnMapping=MagicMock()),
+                "evidently.metrics": MagicMock(
+                    DataDriftTable=MagicMock(), DatasetDriftMetric=MagicMock()
+                ),
+                "evidently.report": MagicMock(Report=mock_report_cls),
+            },
+        ):
             rng = np.random.default_rng(0)
             ref = pd.DataFrame({"avg_spend_7d": rng.normal(100, 20, 200)})
             cur = pd.DataFrame({"avg_spend_7d": rng.normal(100, 20, 200)})
@@ -369,8 +390,10 @@ class TestDriftDetectorDetect:
         ref_date = datetime(2024, 1, 1)
         cur_date = datetime(2024, 6, 1)
         report = det.detect(
-            self._ref_df(), self._cur_df(),
-            reference_date=ref_date, current_date=cur_date
+            self._ref_df(),
+            self._cur_df(),
+            reference_date=ref_date,
+            current_date=cur_date,
         )
         assert report.reference_date == ref_date
         assert report.current_date == cur_date
@@ -386,25 +409,17 @@ class TestDriftDetectorDetect:
 # detect_prediction_drift()
 # ---------------------------------------------------------------------------
 
+
 class TestDetectPredictionDrift:
     def test_returns_feature_drift_result(self):
-        with patch.dict("sys.modules", {"scipy": MagicMock(), "scipy.stats": MagicMock(
-            ks_2samp=MagicMock(return_value=(0.1, 0.001))
-        )}):
-            from monitoring import drift_detector
-            from scipy import stats as mock_stats
-            det = DriftDetector(model_name="m")
-            rng = np.random.default_rng(0)
-            ref = pd.Series(rng.uniform(0, 1, 500))
-            cur = pd.Series(rng.uniform(0.3, 1, 500))
-
-            # Use real scipy since it's available via numpy
-            with patch("monitoring.drift_detector._compute_psi", return_value=0.05):
-                from scipy.stats import ks_2samp
-                result = det.detect_prediction_drift(ref, cur)
-
-            assert isinstance(result, FeatureDriftResult)
-            assert result.feature_name == "__prediction__"
+        det = DriftDetector(model_name="m")
+        rng = np.random.default_rng(0)
+        ref = pd.Series(rng.uniform(0, 1, 500))
+        cur = pd.Series(rng.uniform(0.3, 1, 500))
+        with patch("monitoring.drift_detector._compute_psi", return_value=0.05):
+            result = det.detect_prediction_drift(ref, cur)
+        assert isinstance(result, FeatureDriftResult)
+        assert result.feature_name == "__prediction__"
 
     def test_feature_name_is_prediction(self):
         det = DriftDetector(model_name="m")
@@ -443,6 +458,7 @@ class TestDetectPredictionDrift:
 # save_report()
 # ---------------------------------------------------------------------------
 
+
 class TestSaveReport:
     def test_creates_file(self, tmp_path):
         det = DriftDetector(model_name="test")
@@ -478,4 +494,3 @@ class TestSaveReport:
         deep_path = str(tmp_path / "a" / "b" / "c" / "report.json")
         det.save_report(report, deep_path)
         assert Path(deep_path).exists()
-
