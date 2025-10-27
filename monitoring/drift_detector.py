@@ -278,7 +278,7 @@ class DriftDetector:
             feature_name="__prediction__",
             stattest_name="ks",
             drift_score=float(p_value),
-            drifted=p_value < 0.05,
+            drifted=bool(p_value < 0.05),
             psi=psi_val,
             psi_label=_psi_label(psi_val),
             reference_mean=float(np.mean(ref)),
