@@ -22,6 +22,11 @@ from typing import Any
 
 import pandas as pd
 
+try:
+    import great_expectations as ge
+except ImportError:  # pragma: no cover
+    ge = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,8 +82,6 @@ class DataQualityMonitor:
           - transaction_type is in known enum
           - event_timestamp is not in the future
         """
-        import great_expectations as ge  # noqa: PLC0415
-
         gdf = ge.from_pandas(df)
         results: list[Any] = []
 
@@ -136,8 +139,6 @@ class DataQualityMonitor:
           - Estimated score in [300, 850]
           - No nulls on key fields
         """
-        import great_expectations as ge  # noqa: PLC0415
-
         gdf = ge.from_pandas(df)
         results: list[Any] = []
 
@@ -191,8 +192,6 @@ class DataQualityMonitor:
 
         Ensures the online store is not returning stale or malformed features.
         """
-        import great_expectations as ge  # noqa: PLC0415
-
         gdf = ge.from_pandas(df)
         results: list[Any] = []
 
@@ -258,8 +257,6 @@ class DataQualityMonitor:
 
         Checks label balance, no-leakage proxies, and feature completeness.
         """
-        import great_expectations as ge  # noqa: PLC0415
-
         gdf = ge.from_pandas(df)
         results: list[Any] = []
 
