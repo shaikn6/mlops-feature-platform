@@ -13,6 +13,11 @@ from typing import Any
 
 import pandas as pd
 
+try:
+    from feast import FeatureStore
+except ImportError:  # pragma: no cover
+    FeatureStore = None  # type: ignore[assignment,misc]
+
 logger = logging.getLogger(__name__)
 
 FEATURE_REPO_PATH = Path(__file__).resolve().parent / "feature_repo"
@@ -68,8 +73,6 @@ class FeatureServer:
 
     def _get_store(self) -> Any:
         if self._store is None:
-            from feast import FeatureStore  # noqa: PLC0415
-
             self._store = FeatureStore(repo_path=str(self._repo_path))
         return self._store
 
