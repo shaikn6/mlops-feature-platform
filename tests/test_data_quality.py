@@ -18,6 +18,7 @@ from monitoring.data_quality import DataQualityMonitor, ValidationResult
 # ValidationResult
 # ---------------------------------------------------------------------------
 
+
 class TestValidationResult:
     def test_to_dict_contains_all_keys(self):
         result = ValidationResult(
@@ -62,7 +63,10 @@ class TestValidationResult:
 # Helpers to build GE mock expectations
 # ---------------------------------------------------------------------------
 
-def _ge_result(success: bool, expectation_type: str = "expect_column_to_exist", column: str = "col"):
+
+def _ge_result(
+    success: bool, expectation_type: str = "expect_column_to_exist", column: str = "col"
+):
     r = MagicMock()
     r.success = success
     r.expectation_config = MagicMock()
@@ -94,34 +98,37 @@ def _mock_ge_df(all_pass: bool = True, num_checks: int = 8):
 # validate_transactions()
 # ---------------------------------------------------------------------------
 
+
 class TestValidateTransactions:
     def _valid_df(self):
-        return pd.DataFrame({
-            "transaction_id": ["t1", "t2"],
-            "customer_id": ["c1", "c2"],
-            "amount": [100.0, 200.0],
-            "event_timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
-            "transaction_type": ["PURCHASE", "REFUND"],
-        })
+        return pd.DataFrame(
+            {
+                "transaction_id": ["t1", "t2"],
+                "customer_id": ["c1", "c2"],
+                "amount": [100.0, 200.0],
+                "event_timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "transaction_type": ["PURCHASE", "REFUND"],
+            }
+        )
 
     def test_returns_validation_result(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_transactions(self._valid_df())
         assert isinstance(result, ValidationResult)
 
     def test_suite_name_is_transactions_suite(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_transactions(self._valid_df())
         assert result.suite_name == "transactions_suite"
 
     def test_all_pass_means_success(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_transactions(self._valid_df())
         assert result.success is True
         assert result.failed_expectations == 0
@@ -129,7 +136,7 @@ class TestValidateTransactions:
     def test_failure_propagates(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=False)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_transactions(self._valid_df())
         assert result.success is False
         assert result.successful_expectations == 0
@@ -137,7 +144,7 @@ class TestValidateTransactions:
     def test_evaluates_multiple_expectations(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_transactions(self._valid_df())
         # At minimum: 5 column exists + 3 null + 2 amount + 1 enum + 1 unique
         assert result.evaluated_expectations >= 10
@@ -147,44 +154,47 @@ class TestValidateTransactions:
 # validate_credit_bureau()
 # ---------------------------------------------------------------------------
 
+
 class TestValidateCreditBureau:
     def _valid_df(self):
-        return pd.DataFrame({
-            "customer_id": ["c1"],
-            "event_timestamp": [datetime(2024, 1, 1)],
-            "credit_utilization": [0.35],
-            "payment_history_score": [0.9],
-            "debt_to_income": [0.4],
-            "estimated_credit_score": [720.0],
-            "credit_age_months": [48],
-            "recent_hard_inquiries_6m": [1],
-        })
+        return pd.DataFrame(
+            {
+                "customer_id": ["c1"],
+                "event_timestamp": [datetime(2024, 1, 1)],
+                "credit_utilization": [0.35],
+                "payment_history_score": [0.9],
+                "debt_to_income": [0.4],
+                "estimated_credit_score": [720.0],
+                "credit_age_months": [48],
+                "recent_hard_inquiries_6m": [1],
+            }
+        )
 
     def test_returns_validation_result(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_credit_bureau(self._valid_df())
         assert isinstance(result, ValidationResult)
 
     def test_suite_name(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_credit_bureau(self._valid_df())
         assert result.suite_name == "credit_bureau_suite"
 
     def test_success_on_all_pass(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_credit_bureau(self._valid_df())
         assert result.success is True
 
     def test_checks_many_columns(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_credit_bureau(self._valid_df())
         assert result.evaluated_expectations >= 8
 
@@ -192,6 +202,7 @@ class TestValidateCreditBureau:
 # ---------------------------------------------------------------------------
 # validate_feature_store_output()
 # ---------------------------------------------------------------------------
+
 
 class TestValidateFeatureStoreOutput:
     def test_returns_trivially_passing_on_empty_df(self):
@@ -211,18 +222,20 @@ class TestValidateFeatureStoreOutput:
         monitor = DataQualityMonitor()
         df = pd.DataFrame({"fraud_rate_90d": [0.01, 0.05, 0.1]})
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_feature_store_output(df)
         assert result.evaluated_expectations >= 1
 
     def test_transaction_counts_checked_when_present(self):
         monitor = DataQualityMonitor()
-        df = pd.DataFrame({
-            "transaction_count_7d": [5, 10],
-            "transaction_count_30d": [20, 30],
-        })
+        df = pd.DataFrame(
+            {
+                "transaction_count_7d": [5, 10],
+                "transaction_count_30d": [20, 30],
+            }
+        )
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_feature_store_output(df)
         assert result.evaluated_expectations >= 2
 
@@ -230,7 +243,7 @@ class TestValidateFeatureStoreOutput:
         monitor = DataQualityMonitor()
         df = pd.DataFrame({"customer_segment": ["RETAIL", "PREMIUM"]})
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_feature_store_output(df)
         assert result.evaluated_expectations >= 1
 
@@ -238,7 +251,7 @@ class TestValidateFeatureStoreOutput:
         monitor = DataQualityMonitor()
         df = pd.DataFrame({"international_txn_ratio_30d": [0.05, 0.1]})
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_feature_store_output(df)
         assert result.evaluated_expectations >= 1
 
@@ -247,26 +260,29 @@ class TestValidateFeatureStoreOutput:
 # validate_training_dataset()
 # ---------------------------------------------------------------------------
 
+
 class TestValidateTrainingDataset:
     def _valid_df(self, rows=2000):
-        return pd.DataFrame({
-            "customer_id": [f"c{i}" for i in range(rows)],
-            "event_timestamp": [datetime(2024, 1, 1)] * rows,
-            "avg_spend_7d": [100.0] * rows,
-            "is_fraud": [False] * rows,
-        })
+        return pd.DataFrame(
+            {
+                "customer_id": [f"c{i}" for i in range(rows)],
+                "event_timestamp": [datetime(2024, 1, 1)] * rows,
+                "avg_spend_7d": [100.0] * rows,
+                "is_fraud": [False] * rows,
+            }
+        )
 
     def test_returns_validation_result(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_training_dataset(self._valid_df())
         assert isinstance(result, ValidationResult)
 
     def test_suite_name(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_training_dataset(self._valid_df())
         assert result.suite_name == "training_dataset_suite"
 
@@ -275,21 +291,21 @@ class TestValidateTrainingDataset:
         df = self._valid_df()
         df = df.rename(columns={"is_fraud": "churn_label"})
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_training_dataset(df, label_col="churn_label")
         assert isinstance(result, ValidationResult)
 
     def test_at_least_4_expectations_checked(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=True)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_training_dataset(self._valid_df())
         assert result.evaluated_expectations >= 4
 
     def test_failure_propagates(self):
         monitor = DataQualityMonitor()
         mock_gdf = _mock_ge_df(all_pass=False)
-        with patch("great_expectations.from_pandas", return_value=mock_gdf):
+        with patch("monitoring.data_quality.ge.from_pandas", return_value=mock_gdf):
             result = monitor.validate_training_dataset(self._valid_df())
         assert result.success is False
 
@@ -297,6 +313,7 @@ class TestValidateTrainingDataset:
 # ---------------------------------------------------------------------------
 # _summarize()
 # ---------------------------------------------------------------------------
+
 
 class TestSummarize:
     def test_all_pass(self):
@@ -344,4 +361,3 @@ class TestSummarize:
         assert summary.statistics["evaluated"] == 5
         assert summary.statistics["successful"] == 4
         assert summary.statistics["unsuccessful"] == 1
-
