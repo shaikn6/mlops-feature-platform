@@ -19,7 +19,7 @@ jobs:
         with: {python-version: "3.11"}
       - name: Install dependencies
         run: |
-          pip install pytest pytest-cov pydantic fastapi uvicorn httpx numpy scipy pandas
+          pip install pytest pytest-cov pydantic fastapi uvicorn httpx numpy scipy pandas great-expectations feast
       - name: Run tests with 95% coverage threshold
         run: |
           pytest tests/ -v \
