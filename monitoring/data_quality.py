@@ -23,9 +23,27 @@ from typing import Any
 import pandas as pd
 
 try:
-    import great_expectations as ge
-except ImportError:  # pragma: no cover
-    ge = None  # type: ignore[assignment]
+    from great_expectations.dataset import PandasDataset as _PandasDataset
+
+    def _from_pandas(df: pd.DataFrame) -> Any:  # pragma: no cover
+        return _PandasDataset(df)
+
+except ImportError:  # GE v1.x removed PandasDataset — use legacy compat shim
+    try:
+        import great_expectations as _ge
+
+        def _from_pandas(df: pd.DataFrame) -> Any:  # pragma: no cover
+            # GE v2 API — still works when installed via pip install great-expectations<1
+            return _ge.from_pandas(df)  # type: ignore[attr-defined]
+
+    except (ImportError, AttributeError):  # pragma: no cover
+
+        def _from_pandas(df: pd.DataFrame) -> Any:  # pragma: no cover
+            raise ImportError(
+                "great_expectations is not installed or has an incompatible version. "
+                "Install: pip install 'great-expectations<1'"
+            )
+
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +100,7 @@ class DataQualityMonitor:
           - transaction_type is in known enum
           - event_timestamp is not in the future
         """
-        gdf = ge.from_pandas(df)
+        gdf = _from_pandas(df)
         results: list[Any] = []
 
         # Schema presence
@@ -101,9 +119,7 @@ class DataQualityMonitor:
 
         # Amount sanity
         results.append(
-            gdf.expect_column_values_to_be_between(
-                "amount", min_value=0.01, max_value=999_999.99
-            )
+            gdf.expect_column_values_to_be_between("amount", min_value=0.01, max_value=999_999.99)
         )
         results.append(gdf.expect_column_values_to_not_be_null("amount"))
 
@@ -139,7 +155,7 @@ class DataQualityMonitor:
           - Estimated score in [300, 850]
           - No nulls on key fields
         """
-        gdf = ge.from_pandas(df)
+        gdf = _from_pandas(df)
         results: list[Any] = []
 
         for col in [
@@ -164,9 +180,7 @@ class DataQualityMonitor:
             )
         )
         results.append(
-            gdf.expect_column_values_to_be_between(
-                "debt_to_income", min_value=0.0, max_value=10.0
-            )
+            gdf.expect_column_values_to_be_between("debt_to_income", min_value=0.0, max_value=10.0)
         )
         results.append(
             gdf.expect_column_values_to_be_between(
@@ -174,9 +188,7 @@ class DataQualityMonitor:
             )
         )
         results.append(
-            gdf.expect_column_values_to_be_between(
-                "credit_age_months", min_value=0, max_value=720
-            )
+            gdf.expect_column_values_to_be_between("credit_age_months", min_value=0, max_value=720)
         )
         results.append(
             gdf.expect_column_values_to_be_between(
@@ -192,7 +204,30 @@ class DataQualityMonitor:
 
         Ensures the online store is not returning stale or malformed features.
         """
-        gdf = ge.from_pandas(df)
+        _known_columns = {
+            "fraud_rate_90d",
+            "transaction_count_7d",
+            "transaction_count_30d",
+            "fraud_count_90d",
+            "avg_spend_7d",
+            "avg_spend_30d",
+            "total_spend_7d",
+            "international_txn_ratio_30d",
+            "customer_segment",
+        }
+        if not _known_columns.intersection(df.columns):
+            # No recognised columns — treat as trivially passing
+            logger.warning("validate_feature_store_output: no known columns found in df.")
+            return ValidationResult(
+                suite_name="feature_store_output_suite",
+                success=True,
+                evaluated_expectations=0,
+                successful_expectations=0,
+                failed_expectations=0,
+                success_percent=100.0,
+            )
+
+        gdf = _from_pandas(df)
         results: list[Any] = []
 
         # Fraud rate must be a probability
@@ -211,9 +246,7 @@ class DataQualityMonitor:
         # Average spend must be positive when not null
         for col in ["avg_spend_7d", "avg_spend_30d", "total_spend_7d"]:
             if col in df.columns:
-                results.append(
-                    gdf.expect_column_values_to_be_between(col, min_value=0.0)
-                )
+                results.append(gdf.expect_column_values_to_be_between(col, min_value=0.0))
 
         # International ratio in [0, 1]
         if "international_txn_ratio_30d" in df.columns:
@@ -233,20 +266,6 @@ class DataQualityMonitor:
                 )
             )
 
-        if not results:
-            # No recognised columns — treat as trivially passing
-            logger.warning(
-                "validate_feature_store_output: no known columns found in df."
-            )
-            return ValidationResult(
-                suite_name="feature_store_output_suite",
-                success=True,
-                evaluated_expectations=0,
-                successful_expectations=0,
-                failed_expectations=0,
-                success_percent=100.0,
-            )
-
         return self._summarize("feature_store_output_suite", results)
 
     def validate_training_dataset(
@@ -257,7 +276,7 @@ class DataQualityMonitor:
 
         Checks label balance, no-leakage proxies, and feature completeness.
         """
-        gdf = ge.from_pandas(df)
+        gdf = _from_pandas(df)
         results: list[Any] = []
 
         # Label must exist and be boolean-ish
@@ -275,9 +294,7 @@ class DataQualityMonitor:
         )
 
         # Feature completeness — at most 5% nulls per feature column
-        feature_cols = [
-            c for c in df.columns if c not in [label_col, "event_timestamp"]
-        ]
+        feature_cols = [c for c in df.columns if c not in [label_col, "event_timestamp"]]
         for col in feature_cols:
             results.append(gdf.expect_column_values_to_not_be_null(col, mostly=0.95))
 
