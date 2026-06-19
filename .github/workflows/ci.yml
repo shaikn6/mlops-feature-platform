@@ -7,14 +7,14 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: {python-version: "3.11"}
       - run: pip install ruff && ruff check . --ignore E501 --ignore UP042 || true
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: {python-version: "3.11"}
       - name: Install dependencies
@@ -35,13 +35,13 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with: {python-version: "3.11"}
       - run: pip install bandit && bandit -r . -ll --exclude ./.git,./tests || true
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t mlops-feature-platform:ci . || echo "No Dockerfile"
         continue-on-error: true
