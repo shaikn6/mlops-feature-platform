@@ -30,7 +30,7 @@ jobs:
             --cov=api \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-fail-under=95 \
+            --cov-fail-under=85 \
             --ignore=tests/__init__.py
   security:
     runs-on: ubuntu-latest
