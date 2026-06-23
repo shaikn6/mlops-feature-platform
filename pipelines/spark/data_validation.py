@@ -231,8 +231,7 @@ def main(args: argparse.Namespace) -> None:
     # Write JSON report to S3
     report_path = f"{args.report_path.rstrip('/')}/validation_{args.current_date}.json"
     report_json = json.dumps(report, indent=2)
-    log.info("Validation report:
-%s", report_json)
+    log.info("Validation report:\n%s", report_json)
 
     # Persist report as a single-partition DataFrame to S3
     spark.createDataFrame([{"report": report_json}])          .coalesce(1)          .write.mode("overwrite")          .text(report_path)

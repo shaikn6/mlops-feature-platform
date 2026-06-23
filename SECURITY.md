@@ -10,7 +10,7 @@
 
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
-Report privately by emailing **shaik.izaaz009@gmail.com** with:
+Report privately by emailing **nagizaazs@gmail.com** with:
 
 - Description of the vulnerability
 - Steps to reproduce

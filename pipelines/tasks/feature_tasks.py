@@ -56,9 +56,7 @@ def compute_features(
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
 
     if result.returncode != 0:
-        log.error("Spark job FAILED:
-STDOUT: %s
-STDERR: %s", result.stdout[-2000:], result.stderr[-2000:])
+        log.error("Spark job FAILED:\nSTDOUT: %s\nSTDERR: %s", result.stdout[-2000:], result.stderr[-2000:])
         raise RuntimeError(f"feature_computation Spark job failed with code {result.returncode}")
 
     log.info("Spark job completed successfully")
@@ -113,8 +111,7 @@ def validate_features(
 
     if result.returncode != 0:
         raise RuntimeError(
-            f"data_validation job failed (code {result.returncode}).
-"
+            f"data_validation job failed (code {result.returncode}).\n"
             f"STDERR: {result.stderr[-2000:]}"
         )
 
@@ -156,8 +153,7 @@ def materialize_to_feast(
                            env={**os.environ, "FEAST_FEATURE_VIEW": fv})
 
         if r.returncode != 0:
-            log.error("Feast materialize failed for %s:
-%s", fv, r.stderr[-1000:])
+            log.error("Feast materialize failed for %s:\n%s", fv, r.stderr[-1000:])
             raise RuntimeError(f"feast materialize failed for feature view: {fv}")
 
         log.info("Materialised %s successfully", fv)
